@@ -73,12 +73,12 @@ object SqlApp extends App{
     .load("src/resources/day (1).csv")
 
   import spark.implicits._
-  //logDF.show()
+//logDF.show()
   logDF.createOrReplaceTempView("df")
-  val user_details = spark.sql("select User_Name, Cpu_Idle_Time from Df")
+  val idle_user_details = spark.sql("select User_Name, Cpu_Idle_Time from Df")
 //   user_details.show()
 
-  user_details.createOrReplaceTempView("Df")
+  idle_user_details.createOrReplaceTempView("Df")
   val sum_idle_time = spark.sql("select User_Name, SUM(Cpu_Idle_Time) as Cpu_Idle_Time from Df group by User_Name")
 //  sum_idle_time.show()
 
@@ -86,6 +86,12 @@ object SqlApp extends App{
   val max_idle_user = spark.sql("select User_Name, Cpu_Idle_Time from Df WHERE Cpu_Idle_Time = (SELECT MAX(Cpu_Idle_Time)from Df)")
   max_idle_user.show()
 
+  logDF.createOrReplaceTempView("df")
+  val lazy_user_details = spark.sql("SELECT User_Name, SUM(Cpu_working_Time) as Working_Time from Df group by User_Name")
+
+  lazy_user_details.createOrReplaceTempView("df")
+  val lazy_user = spark.sql("SELECT User_Name, Working_Time from Df WHERE Working_Time = (SELECT MIN(Working_Time) from DF)")
+  lazy_user.show()
 
 
 
