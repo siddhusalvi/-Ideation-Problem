@@ -62,57 +62,15 @@ object SqlApp extends App{
   val prePath = "src/resources/day ("
   val postPath=").csv"
 
-  val logDF1 = spark.read
-    .format("csv")
-    .option("header", true)
-    .schema(logDfSchema)
-    .load("src/resources/day (1).csv")
-
   val logDF1 = getDfFromCsv(prePath+"1"+postPath,spark,logDfSchema)
   val logDF2 = getDfFromCsv(prePath+"2"+postPath,spark,logDfSchema)
-
-  val logDF3 = spark.read
-    .format("csv")
-    .option("header", true)
-    .schema(logDfSchema)
-    .load("src/resources/day (3).csv")
-
-  val logDF4 = spark.read
-    .format("csv")
-    .option("header", true)
-    .schema(logDfSchema)
-    .load("src/resources/day (4).csv")
-
-  val logDF5 = spark.read
-    .format("csv")
-    .option("header", true)
-    .schema(logDfSchema)
-    .load("src/resources/day (5).csv")
-
-  val logDF6 = spark.read
-    .format("csv")
-    .option("header", true)
-    .schema(logDfSchema)
-    .load("src/resources/day (6).csv")
-
-  val logDF7 = spark.read
-    .format("csv")
-    .option("header", true)
-    .schema(logDfSchema)
-    .load("src/resources/day (7).csv")
-
-  val logDF8 = spark.read
-    .format("csv")
-    .option("header", true)
-    .schema(logDfSchema)
-    .load("src/resources/day (8).csv")
-
-
-  val logDF9 = spark.read
-    .format("csv")
-    .option("header", true)
-    .schema(logDfSchema)
-    .load("src/resources/day (9).csv")
+  val logDF3 = getDfFromCsv(prePath+"3"+postPath,spark,logDfSchema)
+  val logDF4 = getDfFromCsv(prePath+"4"+postPath,spark,logDfSchema)
+  val logDF5 = getDfFromCsv(prePath+"5"+postPath,spark,logDfSchema)
+  val logDF6 = getDfFromCsv(prePath+"6"+postPath,spark,logDfSchema)
+  val logDF7 = getDfFromCsv(prePath+"7"+postPath,spark,logDfSchema)
+  val logDF8 = getDfFromCsv(prePath+"8"+postPath,spark,logDfSchema)
+  val logDF9 = getDfFromCsv(prePath+"9"+postPath,spark,logDfSchema)
 
   val logDF = logDF1.union(logDF2).union(logDF3).union(logDF4).union(logDF5).union(logDF6).union(logDF7).union(logDF8).union(logDF9)
   import spark.implicits._
@@ -126,6 +84,7 @@ object SqlApp extends App{
   val highestIdleUser = idleUserDetails.groupBy(col("User_Name"))
   .sum("Cpu_Idle_Time").withColumnRenamed("sum(Cpu_Idle_Time)","Cpu_Idle_Time")
     .orderBy(col("Cpu_Idle_Time").desc)
+    .withColumnRenamed("Cpu_Idle_Time","highest_Idle_hours")
     .show(1)
 
   def getDfFromCsv(path:String,spark:SparkSession,strct:StructType): DataFrame ={
