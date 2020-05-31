@@ -1,3 +1,4 @@
+import org.apache.spark.sql.catalyst.expressions.Hour
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.{DataFrame, SparkSession}
@@ -26,7 +27,6 @@ object SqlApp extends App {
 
     val logDF = logDF1.union(logDF2).union(logDF3).union(logDF4).union(logDF5).union(logDF6).union(logDF7).union(logDF8).union(logDF9)
 
-
     //Finding highest idle user
     val idleUserDetails = logDF.select(
       logDF.col("User_Name"),
@@ -37,7 +37,7 @@ object SqlApp extends App {
       .sum("Cpu_Idle_Time").withColumnRenamed("sum(Cpu_Idle_Time)", "Cpu_Idle_Time")
       .orderBy(col("Cpu_Idle_Time").desc)
       .withColumnRenamed("Cpu_Idle_Time", "highest_Idle_hours")
-      .show(1)
+//      .show(1)
 
     //Finding highest working user
     val workingUserDetails = logDF.select(
@@ -50,7 +50,7 @@ object SqlApp extends App {
       .sum("Working_Action").withColumnRenamed("sum(Working_Action)", "Working_Action")
       .orderBy(col("Working_Action"))
       .withColumnRenamed("Working_Action", "lowest_Working_User")
-      .show(1)
+//      .show(1)
 
     //Finding late entries
     val log1Arrival = getArrivalTime(logDF1)
@@ -67,15 +67,41 @@ object SqlApp extends App {
 
 
     val leaves = logArrival.groupBy(col("User_Name"))
-      .count()
+    .count()
 
     val highestLeavesUser = leaves.withColumn("Leaves", expr("9 - count")).drop("count").orderBy(col("Leaves").desc)
 
-    highestLeavesUser.show()
+//    highestLeavesUser.show()
+
+
+
+    val timestamp =   logDF.select(
+      logDF.col("DateTime")
+    )
+      .orderBy("DateTime")
+      .withColumn("Time", date_format(col("DateTime"), "HH:mm"))
+
+
+    timestamp.show()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
   } catch {
-    case _ => println("Exception")
+    case exception => println(exception)
   }
 
 
