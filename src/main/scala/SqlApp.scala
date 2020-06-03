@@ -1,4 +1,3 @@
-import org.apache.spark.sql.catalyst.expressions.Hour
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.{DataFrame, SparkSession}
@@ -10,8 +9,26 @@ object SqlApp extends App {
       .appName("SqlApp")
       .getOrCreate()
 
-    val logDfSchema = getDfSchema()
+    val logDF = getAllData(spark)
+    logDF.show()
+    val highestIdleUser = getHighestIdleUser(logDF)
+    highestIdleUser.show()
 
+    val lowestWorikingUser = getLowestWorkingUser(logDF)
+    lowestWorikingUser.show()
+
+    val leavesOfUser = getLeaves(spark)
+    leavesOfUser.show()
+
+    val lateUsers = getLateComingUser(spark)
+    lateUsers.show()
+
+  } catch {
+    case exception => println(exception)
+  }
+
+  def getAllData(spark: SparkSession): DataFrame = {
+    val logDfSchema = getDfSchema()
     val prePath = "src/resources/day ("
     val postPath = ").csv"
 
@@ -26,94 +43,10 @@ object SqlApp extends App {
     val logDF9 = getDfFromCsv(prePath + "9" + postPath, spark, logDfSchema)
 
     val logDF = logDF1.union(logDF2).union(logDF3).union(logDF4).union(logDF5).union(logDF6).union(logDF7).union(logDF8).union(logDF9)
-
-    //Finding highest idle user
-    val idleUserDetails = logDF.select(
-      logDF.col("User_Name"),
-      logDF.col("Cpu_Idle_Time")
-    )
-
-    val highestIdleUser = idleUserDetails.groupBy(col("User_Name"))
-      .sum("Cpu_Idle_Time").withColumnRenamed("sum(Cpu_Idle_Time)", "Cpu_Idle_Time")
-      .orderBy(col("Cpu_Idle_Time").desc)
-      .withColumnRenamed("Cpu_Idle_Time", "highest_Idle_hours")
-//      .show(1)
-
-    //Finding highest working user
-    val workingUserDetails = logDF.select(
-      logDF.col("User_Name"),
-      logDF.col("Keyboard") + logDF.col("Mouse") as ("Working_Action")
-    )
-
-
-    val lowestWorkingUser = workingUserDetails.groupBy(col("User_Name"))
-      .sum("Working_Action").withColumnRenamed("sum(Working_Action)", "Working_Action")
-      .orderBy(col("Working_Action"))
-      .withColumnRenamed("Working_Action", "lowest_Working_User")
-//      .show(1)
-
-    //Finding late entries
-    val log1Arrival = getArrivalTime(logDF1)
-    val log2Arrival = getArrivalTime(logDF2)
-    val log3Arrival = getArrivalTime(logDF3)
-    val log4Arrival = getArrivalTime(logDF4)
-    val log5Arrival = getArrivalTime(logDF5)
-    val log6Arrival = getArrivalTime(logDF6)
-    val log7Arrival = getArrivalTime(logDF7)
-    val log8Arrival = getArrivalTime(logDF8)
-    val log9Arrival = getArrivalTime(logDF9)
-
-    val logArrival = log1Arrival.union(log2Arrival).union(log3Arrival).union(log4Arrival).union(log5Arrival).union(log6Arrival).union(log7Arrival).union(log8Arrival).union(log9Arrival)
-
-
-    val leaves = logArrival.groupBy(col("User_Name"))
-    .count()
-
-    val highestLeavesUser = leaves.withColumn("Leaves", expr("9 - count")).drop("count").orderBy(col("Leaves").desc)
-
-//    highestLeavesUser.show()
-
-
-
-    val timestamp =   logDF.select(
-      logDF.col("DateTime")
-    )
-      .orderBy("DateTime")
-      .withColumn("Time", date_format(col("DateTime"), "HH:mm"))
-
-
-    timestamp.show()
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-  } catch {
-    case exception => println(exception)
+    logDF
   }
 
-
-  def getArrivalTime(df: DataFrame): DataFrame = {
-    val newDf = df.select(
-      df.col("User_Name"),
-      df.col("DateTime")
-    ).dropDuplicates(Array("User_Name"))
-    newDf
-  }
-
-  //Fuction to get csv dataframe
+  //Function to get csv dataframe
   def getDfFromCsv(path: String, spark: SparkSession, strct: StructType): DataFrame = {
     val DF = spark.read
       .format("csv")
@@ -177,5 +110,110 @@ object SqlApp extends App {
     )
     schema
   }
-}
 
+  //Function to get
+  def getHighestIdleUser(logDF: DataFrame): DataFrame = {
+    //Finding highest idle user
+    val idleUserDetails = logDF.select(
+      logDF.col("User_Name"),
+      logDF.col("Cpu_Idle_Time")
+    )
+
+    val highestIdleUser = idleUserDetails.groupBy(col("User_Name"))
+      .sum("Cpu_Idle_Time").withColumnRenamed("sum(Cpu_Idle_Time)", "Cpu_Idle_Time")
+      .orderBy(col("Cpu_Idle_Time").desc)
+      .withColumnRenamed("Cpu_Idle_Time", "highest_Idle_hours")
+    highestIdleUser
+  }
+
+  def getLowestWorkingUser(logDF: DataFrame): DataFrame = {
+    val workingUserDetails = logDF.select(
+      logDF.col("User_Name"),
+      logDF.col("Keyboard") + logDF.col("Mouse") as ("Working_Action")
+    )
+
+
+    val lowestWorkingUser = workingUserDetails.groupBy(col("User_Name"))
+      .sum("Working_Action").withColumnRenamed("sum(Working_Action)", "Working_Action")
+      .orderBy(col("Working_Action"))
+      .withColumnRenamed("Working_Action", "lowest_Working_User")
+    lowestWorkingUser
+  }
+
+  def getLateComingUser(spark: SparkSession): DataFrame = {
+    val logDF = getArrivalData(spark)
+    val timestamp = logDF.select(
+      logDF.col("DateTime"),
+      logDF.col("User_Name")
+    )
+      .orderBy("DateTime")
+      .withColumn("Hour", date_format(col("DateTime"), "HH"))
+      .withColumn("min", date_format(col("DateTime"), "mm"))
+      .withColumn("Arrival", date_format(col("DateTime"), "HH:mm"))
+      .withColumn("hr", col("Hour").cast(IntegerType))
+      .withColumn("mn", col("min").cast(IntegerType))
+      .withColumn("mns", col("hr") * 60 + col("mn"))
+      .drop(col("Hour"))
+      .drop(col("min"))
+      .drop(col("hr"))
+      .drop(col("mn"))
+      .withColumn("lateMIN", col("mns") - 510)
+      .drop(col("mns"))
+      .orderBy(col("lateMIN").desc)
+
+    val highestLateUser = timestamp.groupBy(col("User_Name"))
+      .avg("LateMIN").withColumnRenamed("avg(LateMIN)", "LateMIN")
+      .orderBy(col("LateMIN").desc)
+      .withColumnRenamed("LateMIN", "highest_LateMIN")
+    highestLateUser
+  }
+
+  def getArrivalData(spark: SparkSession): DataFrame = {
+    val logDfSchema = getDfSchema()
+
+    val prePath = "src/resources/day ("
+    val postPath = ").csv"
+
+
+    val logDF1 = getDfFromCsv(prePath + "1" + postPath, spark, logDfSchema)
+    val logDF2 = getDfFromCsv(prePath + "2" + postPath, spark, logDfSchema)
+    val logDF3 = getDfFromCsv(prePath + "3" + postPath, spark, logDfSchema)
+    val logDF4 = getDfFromCsv(prePath + "4" + postPath, spark, logDfSchema)
+    val logDF5 = getDfFromCsv(prePath + "5" + postPath, spark, logDfSchema)
+    val logDF6 = getDfFromCsv(prePath + "6" + postPath, spark, logDfSchema)
+    val logDF7 = getDfFromCsv(prePath + "7" + postPath, spark, logDfSchema)
+    val logDF8 = getDfFromCsv(prePath + "8" + postPath, spark, logDfSchema)
+    val logDF9 = getDfFromCsv(prePath + "9" + postPath, spark, logDfSchema)
+
+
+    val log1Arrival = getArrivalTime(logDF1)
+    val log2Arrival = getArrivalTime(logDF2)
+    val log3Arrival = getArrivalTime(logDF3)
+    val log4Arrival = getArrivalTime(logDF4)
+    val log5Arrival = getArrivalTime(logDF5)
+    val log6Arrival = getArrivalTime(logDF6)
+    val log7Arrival = getArrivalTime(logDF7)
+    val log8Arrival = getArrivalTime(logDF8)
+    val log9Arrival = getArrivalTime(logDF9)
+
+    val logArrival = log1Arrival.union(log2Arrival).union(log3Arrival).union(log4Arrival).union(log5Arrival).union(log6Arrival).union(log7Arrival).union(log8Arrival).union(log9Arrival)
+    logArrival
+  }
+
+  def getArrivalTime(df: DataFrame): DataFrame = {
+    val newDf = df.select(
+      df.col("User_Name"),
+      df.col("DateTime")
+    ).dropDuplicates(Array("User_Name"))
+    newDf
+  }
+
+  def getLeaves(spark: SparkSession): DataFrame = {
+    val logArrival = getArrivalData(spark)
+    val leaves = logArrival.groupBy(col("User_Name"))
+      .count()
+    val highestLeavesUser = leaves.withColumn("Leaves", expr("9 - count")).drop("count").orderBy(col("Leaves").desc)
+    highestLeavesUser
+  }
+
+}
