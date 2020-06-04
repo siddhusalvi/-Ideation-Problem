@@ -9,19 +9,56 @@ object SqlApp extends App {
       .appName("SqlApp")
       .getOrCreate()
 
-    val logDF = getAllData(spark)
-    logDF.show()
-    val highestIdleUser = getHighestIdleUser(logDF)
-    highestIdleUser.show()
 
-    val lowestWorikingUser = getLowestWorkingUser(logDF)
-    lowestWorikingUser.show()
+    val logDfSchema = getDfSchema()
+    val prePath = "src/resources/day ("
+    val postPath = ").csv"
 
-    val leavesOfUser = getLeaves(spark)
-    leavesOfUser.show()
+    val logDF = getDfFromCsv(prePath + "1" + postPath, spark, logDfSchema)
+//    logDF.show()
 
-    val lateUsers = getLateComingUser(spark)
-    lateUsers.show()
+    val Df = logDF
+      .withColumn("Keyboard", col("keyboard").cast(IntegerType))
+      .withColumn("Mouse", col("mouse").cast(IntegerType))
+      .withColumn("User",col("User_Name"))
+      .orderBy(col("User"))
+      .select(col("User"),col("keyboard"),col("mouse"),col("DateTime"))
+      .orderBy(col("User"),col("DateTime"))
+
+  Df.show(300)
+    var flag = true
+    var name:String = ""
+    var counter = 0
+    var output:String = ""
+    Df.foreach { row =>
+      var data = row.toSeq
+      if((data(1).toString.toInt + data(2).toString.toInt)==0){
+        println("Idle : "+data(0)+" "+counter+" "+data(3))
+        if(flag){
+          name = data(0).toString
+          flag = false
+          counter = 1
+          println(name+" is added 1st time "+counter+" "+data(3))
+        }else if(data(0).toString.equals(name)){
+          counter +=1
+          name = data(0).toString
+          println(name+" is added "+counter+" "+data(3))
+        }else{
+          name = data(0).toString
+          flag = false
+          counter = 1
+          println(name+" is added 1st time at "+counter+" "+data(3))
+        }
+      }else{
+        if(counter > 5){
+          println(name+" was idle for "+(counter*5).toString+" "+data(3).toString+"\n")
+        }
+        counter = 0
+        flag = true
+
+      }
+    }
+
 
   } catch {
     case exception => println(exception)
