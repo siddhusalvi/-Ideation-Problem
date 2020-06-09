@@ -1,67 +1,132 @@
+import java.io.FileWriter
+
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.{DataFrame, SparkSession}
+import org.json4s.Writer
 
-object SqlApp extends App {
-  try {
-    val spark = SparkSession.builder()
-      .config("spark.master", "local")
-      .appName("SqlApp")
-      .getOrCreate()
+case class User(id:String,time:Long)
+object SqlApp  {
 
-
-    val logDfSchema = getDfSchema()
-    val prePath = "src/resources/day ("
-    val postPath = ").csv"
-
-    val logDF = getDfFromCsv(prePath + "1" + postPath, spark, logDfSchema)
-//    logDF.show()
-
-    val Df = logDF
-      .withColumn("Keyboard", col("keyboard").cast(IntegerType))
-      .withColumn("Mouse", col("mouse").cast(IntegerType))
-      .withColumn("User",col("User_Name"))
-      .orderBy(col("User"))
-      .select(col("User"),col("keyboard"),col("mouse"),col("DateTime"))
-      .orderBy(col("User"),col("DateTime"))
-
-  Df.show(300)
-    var flag = true
-    var name:String = ""
-    var counter = 0
-    var output:String = ""
-    Df.foreach { row =>
-      var data = row.toSeq
-      if((data(1).toString.toInt + data(2).toString.toInt)==0){
-        println("Idle : "+data(0)+" "+counter+" "+data(3))
-        if(flag){
-          name = data(0).toString
-          flag = false
-          counter = 1
-          println(name+" is added 1st time "+counter+" "+data(3))
-        }else if(data(0).toString.equals(name)){
-          counter +=1
-          name = data(0).toString
-          println(name+" is added "+counter+" "+data(3))
-        }else{
-          name = data(0).toString
-          flag = false
-          counter = 1
-          println(name+" is added 1st time at "+counter+" "+data(3))
-        }
-      }else{
-        if(counter > 5){
-          println(name+" was idle for "+(counter*5).toString+" "+data(3).toString+"\n")
-        }
-        counter = 0
-        flag = true
-
-      }
-    }
+  def main(args: Array[String]): Unit = {
 
 
-  } catch {
-    case exception => println(exception)
+//    try {
+      val spark = SparkSession.builder()
+        .config("spark.master", "local")
+        .appName("SqlApp")
+        .getOrCreate()
+
+      val sc = spark.sparkContext
+
+      val logDfSchema = getDfSchema()
+      val path = "src\\resources\\Df.csv"
+
+      val prePath = "src/resources/day ("
+      val postPath = ").csv"
+
+      val logDF = getAllData(spark)
+
+      getIdleTime(logDF,path,spark)
+      //    logDF.show()
+//
+//      val Df = logDF
+//        .withColumn("Keyboard", col("keyboard").cast(IntegerType))
+//        .withColumn("Mouse", col("mouse").cast(IntegerType))
+//        .withColumn("User", col("User_Name"))
+//        .orderBy(col("User"))
+//        .select(col("User"), col("keyboard"), col("mouse"), col("DateTime"))
+//        .orderBy(col("User"), col("DateTime"))
+//
+//
+//
+
+
+
+      //    val idealHours = Df.withColumn("Recent",when(col("keyboard")+col("mouse") === 0,1)
+      //        .otherwise(0)
+      //    )
+      //      .orderBy(col("User"),col("DateTime"))
+      //
+      //    val window = Window.partitionBy("User").orderBy("DateTime")
+      //
+      //    val newDF = idealHours.withColumn("sum",
+      //      when((lag("Recent",1,0).over(window) ===1),col("")+)
+      //        .otherwise(0)
+      //      )
+
+
+      //    val window = Window.partitionBy("User").orderBy("DateTime")
+      //
+      //
+      //    val cumulativeData = idealHours.withColumn("record",
+      //      when(
+      //        (lag("Recent",1,0)over(window))===1,
+      //        (lag("Recent",1,0)over(window))+1
+      //      ).otherwise(0)
+      //    )
+      //
+      //      cumulativeData.show(300)
+
+
+      //val df2 = df.withColumn("new_gender", when(col("gender") === "M","Male")
+      //          .when(col("gender") === "F","Female")
+      //          .otherwise("Unknown"))
+      //
+//      val lst = List[User]()
+//      val countAc = sc.longAccumulator
+//      var output: String = ""
+//      var name: String = ""
+//      var flag = true
+//      var seq=Seq[User]()
+//      for (row <- Df) {
+//
+//
+//        var data = row.toSeq
+//        if ((data(1).toString.toInt + data(2).toString.toInt) == 0) {
+//          if (flag) {
+//            name = data(0).toString
+//            flag = false
+//            countAc.reset()
+//            countAc.add(1)
+//          } else if (data(0).toString.equals(name)) {
+//            countAc.add(1)
+//            name = data(0).toString
+//          } else {
+//            name = data(0).toString
+//            flag = false
+//            countAc.reset()
+//            countAc.add(1)
+//          }
+//        } else {
+//          if (countAc.value > 5) {
+//            var str = name+","+countAc.value+"\n"
+//            writer.write(str)
+//          }
+//          countAc.reset()
+//          flag = true
+//        }
+//      }
+//      writer.close()
+//
+//      val schema = StructType(
+//        Array(
+//          StructField("ID", StringType),
+//          StructField("Time", IntegerType)
+//        )
+//      )
+//
+//      val DDF = spark.read
+//        .format("csv")
+//        .schema(schema)
+//        .load(path)
+//
+//      DDF.show(300)
+
+
+//    } catch {
+//      case exception => println(exception)
+//    }
   }
 
   def getAllData(spark: SparkSession): DataFrame = {
@@ -251,6 +316,74 @@ object SqlApp extends App {
       .count()
     val highestLeavesUser = leaves.withColumn("Leaves", expr("9 - count")).drop("count").orderBy(col("Leaves").desc)
     highestLeavesUser
+  }
+
+  def getIdleTime(dataframe: DataFrame,path:String,spark:SparkSession):Unit={
+
+
+  val writer =new FileWriter(path, false)
+
+          val Df = dataframe
+            .withColumn("Keyboard", col("keyboard").cast(IntegerType))
+            .withColumn("Mouse", col("mouse").cast(IntegerType))
+            .withColumn("User", col("User_Name"))
+            .orderBy(col("User"))
+            .select(col("User"), col("keyboard"), col("mouse"), col("DateTime"))
+            .orderBy(col("User"), col("DateTime")).collect()
+
+
+    val lst = List[User]()
+    val sc = spark.sparkContext
+    val countAc = sc.longAccumulator
+    var output: String = ""
+    var name: String = ""
+    var flag = true
+    var seq = Seq[User]()
+    for (row <- Df) {
+
+
+      var data = row.toSeq
+      if ((data(1).toString.toInt + data(2).toString.toInt) == 0) {
+        if (flag) {
+          name = data(0).toString
+          flag = false
+          countAc.reset()
+          countAc.add(1)
+        } else if (data(0).toString.equals(name)) {
+          countAc.add(1)
+          name = data(0).toString
+        } else {
+          name = data(0).toString
+          flag = false
+          countAc.reset()
+          countAc.add(1)
+        }
+      } else {
+        if (countAc.value > 5) {
+          var str = name + "," + countAc.value + "\n"
+          writer.write(str)
+        }
+        countAc.reset()
+        flag = true
+      }
+    }
+    writer.close()
+
+    val schema = StructType(
+      Array(
+        StructField("ID", StringType),
+        StructField("Time", IntegerType)
+      )
+    )
+
+    val DDF = spark.read
+      .format("csv")
+      .schema(schema)
+      .load(path)
+
+    DDF.show(300)
+
+
   }
 
 }
