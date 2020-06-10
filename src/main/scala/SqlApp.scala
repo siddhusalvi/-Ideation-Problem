@@ -1,4 +1,6 @@
 import java.io.FileWriter
+
+import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.{DataFrame, SparkSession}
@@ -295,42 +297,21 @@ object SqlApp {
 
   def getUserEntries(DF:DataFrame):Unit={
     val arrivalDF = getArrivalTime(DF).withColumnRenamed("DateTime","Arrival")
-
     val leavingDF = getDepartureTime(DF).withColumnRenamed("DateTime","Departure")
-
-
 
     val userEntries = arrivalDF.join(leavingDF,arrivalDF.col("User_Name") === leavingDF.col("User_Name"))
         .drop(leavingDF.col("User_Name"))
+
     val workCalculation = userEntries
-      .withColumn("ArrivalTime", date_format(col("Arrival"), "HH:mm"))
+      .withColumn("ArrivalTime", date_format(col("Arrival"), "KK:HH:mm a"))
       .withColumn("LeavingTime", date_format(col("Departure"), "KK:HH:mm a"))
-      .withColumn("ArrivalHr", date_format(col("Arrival"), "HH").cast(IntegerType))
-      .withColumn("ArrivalMn", date_format(col("Arrival"), "mm").cast(IntegerType))
-      .withColumn("Arrivalmin",
-          date_format(col("Arrival"), "HH").cast(IntegerType)*60 + date_format(col("Arrival"), "mm").cast(IntegerType)
-        )
-      .withColumn("Leavingmin",
-        date_format(col("Departure"), "HH").cast(IntegerType)*60 + date_format(col("Departure"), "mm").cast(IntegerType)
+      .withColumn("Duration",
+        date_format(col("Departure"), "HH").cast(IntegerType)*60 + date_format(col("Departure"), "mm").cast(IntegerType)  -
+        date_format(col("Arrival"), "HH").cast(IntegerType)*60 + date_format(col("Arrival"), "mm").cast(IntegerType)
       )
-//      .withColumn("ArrivalHr", col("ArrivalHour").cast(IntegerType))
-//      .withColumn("ArrivalMn", col("ArrivalMin").cast(IntegerType))
-
-
-      workCalculation.show()
-
-//    .withColumn("Hour", date_format(col("DateTime"), "HH"))
-//      .withColumn("min", date_format(col("DateTime"), "mm"))
-//      .withColumn("Arrival", date_format(col("DateTime"), "HH:mm"))
-//      .withColumn("hr", col("Hour").cast(IntegerType))
-//      .withColumn("mn", col("min").cast(IntegerType))
-//      .withColumn("mns", col("hr") * 60 + col("mn"))
-//      .drop(col("Hour"))
-//      .drop(col("min"))
-//      .drop(col("hr"))
-//      .drop(col("mn"))
-
-
+      .withColumn("DurationInHr",col("Duration")/60)
+      .drop("Arrival","Departure")
+      workCalculation
   }
 
 }
