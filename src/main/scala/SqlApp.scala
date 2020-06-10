@@ -17,8 +17,8 @@ object SqlApp {
       val prePath = "src/resources/day ("
       val postPath = ").csv"
       val logDF = getDfFromCsv(prePath + "9" + postPath, spark, logDfSchema)
-      logDF.show(300)
-      val idleUsers = getIdleTime(logDF, path, spark)
+
+      val idleUsers = getDepartureTime(logDF)
       idleUsers.show(25)
     } catch {
       case exception => println(exception)
@@ -273,6 +273,13 @@ object SqlApp {
       df.col("User_Name"),
       df.col("DateTime")
     ).dropDuplicates(Array("User_Name"))
+    newDf
+  }
+  def getDepartureTime(df:DataFrame):DataFrame={
+    val newDf = df.orderBy(col("DateTime")desc).select(
+      df.col("User_Name"),
+      df.col("DateTime")
+    ).dropDuplicates(Array("User_Name")).orderBy("DateTime")
     newDf
   }
 
