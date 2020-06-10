@@ -22,7 +22,8 @@ object SqlApp {
 
 
 
-      val getWorkOfUser =getUserEntries(logDF)
+      val getWorkOfUser =getUserWorkData(logDF,path,spark)
+
     } catch {
       case exception => println(exception)
     }
@@ -152,8 +153,8 @@ object SqlApp {
     val idleUsers = userData.groupBy(col("ID")).sum("Time")
 
     val idleTime = idleUsers.withColumnRenamed("sum(Time)", "Count")
-      .withColumn("time", col("Count") * 5 / 60)
-      .orderBy(col("time") desc)
+      .withColumn("IdealTime", col("Count") * 5)
+      .orderBy(col("IdealTime") desc)
 
     idleTime
   }
@@ -295,6 +296,7 @@ object SqlApp {
     highestLeavesUser
   }
 
+  //function to calculate working duration
   def getUserEntries(DF:DataFrame):DataFrame={
     val arrivalDF = getArrivalTime(DF).withColumnRenamed("DateTime","Arrival")
     val leavingDF = getDepartureTime(DF).withColumnRenamed("DateTime","Departure")
@@ -305,13 +307,35 @@ object SqlApp {
     val workCalculation = userEntries
       .withColumn("ArrivalTime", date_format(col("Arrival"), "KK:HH:mm a"))
       .withColumn("LeavingTime", date_format(col("Departure"), "KK:HH:mm a"))
-      .withColumn("Duration",
+      .withColumn("OfficeTime",
         date_format(col("Departure"), "HH").cast(IntegerType)*60 + date_format(col("Departure"), "mm").cast(IntegerType)  -
         date_format(col("Arrival"), "HH").cast(IntegerType)*60 + date_format(col("Arrival"), "mm").cast(IntegerType)
       )
-      .withColumn("DurationInHr",col("Duration")/60)
+
       .drop("Arrival","Departure")
       workCalculation
+  }
+
+  def getUserWorkData(Df:DataFrame, path: String, spark: SparkSession):DataFrame={
+
+   val userIdleData = getIdleTime(Df,path,spark)
+   val userEntries = getUserEntries(Df)
+
+   val df = userIdleData.join(userEntries, userIdleData.col("ID") === userEntries.col("User_Name"))
+
+   val userData = df.drop(col("User_Name"))
+       .withColumn("WorkTime",
+         floor(col("OfficeTime").cast(IntegerType)/60) + col("OfficeTime")%60*.01
+       )
+       .withColumn("WorkingHours",
+         floor((col("OfficeTime")-col("IdealTime"))/60) + (col("OfficeTime")-col("IdealTime"))%60 * .01
+       )
+       .withColumn("IdleTime",
+         (floor(col("IdealTime")/60) + col("IdealTime")%60 * .01).cast(DataTypes.createDecimalType(32,2))
+       )
+       .withColumnRenamed("ID","UserName")
+       .drop("Count","OfficeTime")
+    userData
   }
 
 }
