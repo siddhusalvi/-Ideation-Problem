@@ -22,7 +22,7 @@ object SqlApp {
 
 
 
-      getUserEntries(logDF)
+      val getWorkOfUser =getUserEntries(logDF)
     } catch {
       case exception => println(exception)
     }
@@ -295,7 +295,7 @@ object SqlApp {
     highestLeavesUser
   }
 
-  def getUserEntries(DF:DataFrame):Unit={
+  def getUserEntries(DF:DataFrame):DataFrame={
     val arrivalDF = getArrivalTime(DF).withColumnRenamed("DateTime","Arrival")
     val leavingDF = getDepartureTime(DF).withColumnRenamed("DateTime","Departure")
 
