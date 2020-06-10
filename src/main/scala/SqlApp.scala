@@ -319,17 +319,14 @@ object SqlApp  {
   }
 
   def getIdleTime(dataframe: DataFrame,path:String,spark:SparkSession):Unit={
-
-
-  val writer =new FileWriter(path, false)
-
-          val Df = dataframe
-            .withColumn("Keyboard", col("keyboard").cast(IntegerType))
-            .withColumn("Mouse", col("mouse").cast(IntegerType))
-            .withColumn("User", col("User_Name"))
-            .orderBy(col("User"))
-            .select(col("User"), col("keyboard"), col("mouse"), col("DateTime"))
-            .orderBy(col("User"), col("DateTime")).collect()
+    val writer =new FileWriter(path, false)
+    val Df = dataframe
+      .withColumn("Keyboard", col("keyboard").cast(IntegerType))
+      .withColumn("Mouse", col("mouse").cast(IntegerType))
+      .withColumn("User", col("User_Name"))
+      .orderBy(col("User"))
+      .select(col("User"), col("keyboard"), col("mouse"), col("DateTime"))
+      .orderBy(col("User"), col("DateTime")).collect()
 
 
     val lst = List[User]()
@@ -340,8 +337,6 @@ object SqlApp  {
     var flag = true
     var seq = Seq[User]()
     for (row <- Df) {
-
-
       var data = row.toSeq
       if ((data(1).toString.toInt + data(2).toString.toInt) == 0) {
         if (flag) {
@@ -381,9 +376,14 @@ object SqlApp  {
       .schema(schema)
       .load(path)
 
-    DDF.show(300)
 
+    val     DDDF = DDF.groupBy(col("ID")).sum("Time")
 
+    val sdf = DDDF.withColumnRenamed("sum(Time)","Count")
+      .withColumn("time",col("Count")*5/60)
+        .orderBy(col("time")desc)
+
+    sdf.show()
   }
 
 }
