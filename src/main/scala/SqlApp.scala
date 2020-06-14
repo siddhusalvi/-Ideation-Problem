@@ -1,9 +1,8 @@
-import java.io.FileWriter
-
-import org.apache.spark.sql.expressions.Window
+import java.io.{File, FileWriter}
+import java.util.Properties
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types._
-import org.apache.spark.sql.{DataFrame, SparkSession}
+import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
 
 object SqlApp {
   def main(args: Array[String]): Unit = {
@@ -13,91 +12,50 @@ object SqlApp {
         .appName("SqlApp")
         .getOrCreate()
 
+      val tablename = "work"
       val sc = spark.sparkContext
       val logDfSchema = getDfSchema()
-      val path = "src\\resources\\Df.csv"
+      val dir = "src\\resources\\"
+      val path = "src\\resources\\output\\userWorkData.csv"
       val prePath = "src/resources/day ("
       val postPath = ").csv"
-      val logDF = getDfFromCsv(prePath + "9" + postPath, spark, logDfSchema)
+      val logDF = getDfFromCsv(prePath + "5" + postPath, spark, logDfSchema)
 
+      val workOfUser = getUserWorkData(logDF, path, spark).orderBy(col("ArrivalTime"))
 
-
-      val getWorkOfUser =getUserWorkData(logDF,path,spark)
+      saveToDB(workOfUser, "workdata")
 
     } catch {
       case exception => println(exception)
     }
   }
 
-  //Function to get csv dataframe
-  def getDfFromCsv(path: String, spark: SparkSession, strct: StructType): DataFrame = {
-    val DF = spark.read
-      .format("csv")
-      .option("header", true)
-      .option("timestampFormat", "MM/dd/yyyy HH:mm:ss.SSSSSS")
-      .schema(strct)
-      .load(path)
-    DF
-  }
+  //Function to get idle time, working time
+  def getUserWorkData(Df: DataFrame, path: String, spark: SparkSession): DataFrame = {
 
-  //Function to get dataframe schema
-  def getDfSchema(): StructType = {
-    val schema = StructType(
-      Array(
-        StructField("DateTime", TimestampType),
-        StructField("Cpu_Count", IntegerType),
-        StructField("Cpu_Working_Time", DoubleType),
-        StructField("Cpu_Idle_Time", DoubleType),
-        StructField("Cpu_Percent", DoubleType),
-        StructField("Usage_Cpu_Count", IntegerType),
-        StructField("Software_Interrupts", IntegerType),
-        StructField("System_calls", IntegerType),
-        StructField("Interrupts", IntegerType),
-        StructField("Load_Time_1_min", DoubleType),
-        StructField("Load_Time_5_min", DoubleType),
-        StructField("Load_Time_15_min", DoubleType),
-        StructField("Total_Memory", DoubleType),
-        StructField("Used_Memory", DoubleType),
-        StructField("Free_Memory", DoubleType),
-        StructField("Active_Memory", DoubleType),
-        StructField("Inactive_Memory", DoubleType),
-        StructField("Bufferd_Memory", DoubleType),
-        StructField("Cache_Memory", DoubleType),
-        StructField("Shared_Memory", DoubleType),
-        StructField("Available_Memory", DoubleType),
-        StructField("Total_Disk_Memory", DoubleType),
-        StructField("Used_Disk_Memory", DoubleType),
-        StructField("Free_Disk_Memory", DoubleType),
-        StructField("Read_Disk_Count", IntegerType),
-        StructField("Write_Disk_Count", IntegerType),
-        StructField("Read_Disk_Bytes", DoubleType),
-        StructField("Write_Disk_Bytes", DoubleType),
-        StructField("Read_Time", IntegerType),
-        StructField("Write_Time", IntegerType),
-        StructField("I/O_Time", IntegerType),
-        StructField("Bytes_Sent", DoubleType),
-        StructField("Bytes_Received", DoubleType),
-        StructField("Packets_Sent", IntegerType),
-        StructField("Packets_Received", IntegerType),
-        StructField("Errors_While_Sending", IntegerType),
-        StructField("Errors_While_Receiving", IntegerType),
-        StructField("Incoming_Packets_Dropped", IntegerType),
-        StructField("Outgoing_Packets_Dropped", IntegerType),
-        StructField("Boot_Time", StringType),
-        StructField("User_Name", StringType),
-        StructField("Keyboard", DoubleType),
-        StructField("Mouse", DoubleType),
-        StructField("Technologies", StringType),
-        StructField("Files_Changed", IntegerType)
+    val userIdleData = getIdleTime(Df, path, spark)
+    val userEntries = getUserEntries(Df)
+    val df = userIdleData.join(userEntries, userIdleData.col("ID") === userEntries.col("User_Name"))
+
+    val userData = df.drop(col("User_Name"))
+      .withColumn("WorkTime",
+        floor(col("OfficeTime").cast(IntegerType) / 60) + col("OfficeTime") % 60 * .01
       )
-    )
-    schema
+      .withColumn("WorkingHours",
+        floor((col("OfficeTime") - col("IdealTime")) / 60) + (col("OfficeTime") - col("IdealTime")) % 60 * .01
+      )
+      .withColumn("IdleTime",
+        (floor(col("IdealTime") / 60) + col("IdealTime") % 60 * .01).cast(DataTypes.createDecimalType(32, 2))
+      )
+      .withColumnRenamed("ID", "UserName")
+      .drop("Count", "OfficeTime")
+    userData
   }
 
   //Function to get idle time of users
-  def getIdleTime(dataframe: DataFrame, path: String, spark: SparkSession): DataFrame = {
+  def getIdleTime(givenData: DataFrame, path: String, spark: SparkSession): DataFrame = {
     val writer = new FileWriter(path, false)
-    val newDf = dataframe
+    val newDF = givenData
       .withColumn("Keyboard", col("keyboard").cast(IntegerType))
       .withColumn("Mouse", col("mouse").cast(IntegerType))
       .withColumn("User", col("User_Name"))
@@ -106,32 +64,36 @@ object SqlApp {
       .orderBy(col("User"), col("DateTime")).collect()
 
     val sc = spark.sparkContext
-    val countAc = sc.longAccumulator
+    val counter = sc.longAccumulator
     var name: String = ""
     var flag = true
-    for (row <- newDf) {
+    for (row <- newDF) {
       var data = row.toSeq
       if ((data(1).toString.toInt + data(2).toString.toInt) == 0) {
         if (flag) {
           name = data(0).toString
           flag = false
-          countAc.reset()
-          countAc.add(1)
+          counter.reset()
+          counter.add(1)
         } else if (data(0).toString.equals(name)) {
-          countAc.add(1)
+          counter.add(1)
           name = data(0).toString
         } else {
+          //          if (counter.value > 5) {
+          //            var str = name + "," + counter.value + "\n"
+          //            writer.write(str)
+          //          }
           name = data(0).toString
           flag = false
-          countAc.reset()
-          countAc.add(1)
+          counter.reset()
+          counter.add(1)
         }
       } else {
-        if (countAc.value > 5) {
-          var str = name + "," + countAc.value + "\n"
+        if (counter.value > 5) {
+          var str = name + "," + counter.value + "\n"
           writer.write(str)
         }
-        countAc.reset()
+        counter.reset()
         flag = true
       }
     }
@@ -157,6 +119,44 @@ object SqlApp {
       .orderBy(col("IdealTime") desc)
 
     idleTime
+  }
+
+  //function to calculate working duration
+  def getUserEntries(DF: DataFrame): DataFrame = {
+    val arrivalDF = getArrivalTime(DF).withColumnRenamed("DateTime", "Arrival")
+    val leavingDF = getDepartureTime(DF).withColumnRenamed("DateTime", "Departure")
+
+    val userEntries = arrivalDF.join(leavingDF, arrivalDF.col("User_Name") === leavingDF.col("User_Name"))
+      .drop(leavingDF.col("User_Name"))
+
+    val workCalculation = userEntries
+      .withColumn("ArrivalTime", date_format(col("Arrival"), "KK:HH:mm a"))
+      .withColumn("LeavingTime", date_format(col("Departure"), "KK:HH:mm a"))
+      .withColumn("OfficeTime",
+        date_format(col("Departure"), "HH").cast(IntegerType) * 60 + date_format(col("Departure"), "mm").cast(IntegerType) -
+          date_format(col("Arrival"), "HH").cast(IntegerType) * 60 + date_format(col("Arrival"), "mm").cast(IntegerType)
+      )
+      .drop("Arrival", "Departure")
+    workCalculation
+  }
+
+  //Function to get leaving time of user
+  def getDepartureTime(df: DataFrame): DataFrame = {
+    val newDf = df.orderBy(col("DateTime") desc).select(
+      df.col("User_Name"),
+      df.col("DateTime")
+    ).dropDuplicates(Array("User_Name")).orderBy("DateTime")
+    newDf
+  }
+
+  def saveToDB(DF: DataFrame, table: String): Unit = {
+    val url = "jdbc:mysql://127.0.0.1:3306"
+    val properties = new Properties()
+    properties.put("user", "root")
+    properties.put("password", System.getenv("dbpass"))
+    Class.forName("com.mysql.jdbc.Driver")
+    val dbTable = "ideation." + table
+    DF.write.mode(SaveMode.Overwrite).jdbc(url, dbTable, properties)
   }
 
   //Function to get all data
@@ -271,19 +271,77 @@ object SqlApp {
     logArrival
   }
 
+  //Function to get csv dataframe
+  def getDfFromCsv(path: String, spark: SparkSession, strct: StructType): DataFrame = {
+    val DF = spark.read
+      .format("csv")
+      .option("header", true)
+      .option("timestampFormat", "MM/dd/yyyy HH:mm:ss.SSSSSS")
+      .schema(strct)
+      .load(path)
+    DF
+  }
+
+  //Function to get dataframe schema
+  def getDfSchema(): StructType = {
+    val schema = StructType(
+      Array(
+        StructField("DateTime", TimestampType),
+        StructField("Cpu_Count", IntegerType),
+        StructField("Cpu_Working_Time", DoubleType),
+        StructField("Cpu_Idle_Time", DoubleType),
+        StructField("Cpu_Percent", DoubleType),
+        StructField("Usage_Cpu_Count", IntegerType),
+        StructField("Software_Interrupts", IntegerType),
+        StructField("System_calls", IntegerType),
+        StructField("Interrupts", IntegerType),
+        StructField("Load_Time_1_min", DoubleType),
+        StructField("Load_Time_5_min", DoubleType),
+        StructField("Load_Time_15_min", DoubleType),
+        StructField("Total_Memory", DoubleType),
+        StructField("Used_Memory", DoubleType),
+        StructField("Free_Memory", DoubleType),
+        StructField("Active_Memory", DoubleType),
+        StructField("Inactive_Memory", DoubleType),
+        StructField("Bufferd_Memory", DoubleType),
+        StructField("Cache_Memory", DoubleType),
+        StructField("Shared_Memory", DoubleType),
+        StructField("Available_Memory", DoubleType),
+        StructField("Total_Disk_Memory", DoubleType),
+        StructField("Used_Disk_Memory", DoubleType),
+        StructField("Free_Disk_Memory", DoubleType),
+        StructField("Read_Disk_Count", IntegerType),
+        StructField("Write_Disk_Count", IntegerType),
+        StructField("Read_Disk_Bytes", DoubleType),
+        StructField("Write_Disk_Bytes", DoubleType),
+        StructField("Read_Time", IntegerType),
+        StructField("Write_Time", IntegerType),
+        StructField("I/O_Time", IntegerType),
+        StructField("Bytes_Sent", DoubleType),
+        StructField("Bytes_Received", DoubleType),
+        StructField("Packets_Sent", IntegerType),
+        StructField("Packets_Received", IntegerType),
+        StructField("Errors_While_Sending", IntegerType),
+        StructField("Errors_While_Receiving", IntegerType),
+        StructField("Incoming_Packets_Dropped", IntegerType),
+        StructField("Outgoing_Packets_Dropped", IntegerType),
+        StructField("Boot_Time", StringType),
+        StructField("User_Name", StringType),
+        StructField("Keyboard", DoubleType),
+        StructField("Mouse", DoubleType),
+        StructField("Technologies", StringType),
+        StructField("Files_Changed", IntegerType)
+      )
+    )
+    schema
+  }
+
   //Function to get single user arrival
   def getArrivalTime(df: DataFrame): DataFrame = {
     val newDf = df.select(
       df.col("User_Name"),
       df.col("DateTime")
     ).dropDuplicates(Array("User_Name"))
-    newDf
-  }
-  def getDepartureTime(df:DataFrame):DataFrame={
-    val newDf = df.orderBy(col("DateTime")desc).select(
-      df.col("User_Name"),
-      df.col("DateTime")
-    ).dropDuplicates(Array("User_Name")).orderBy("DateTime")
     newDf
   }
 
@@ -296,46 +354,10 @@ object SqlApp {
     highestLeavesUser
   }
 
-  //function to calculate working duration
-  def getUserEntries(DF:DataFrame):DataFrame={
-    val arrivalDF = getArrivalTime(DF).withColumnRenamed("DateTime","Arrival")
-    val leavingDF = getDepartureTime(DF).withColumnRenamed("DateTime","Departure")
-
-    val userEntries = arrivalDF.join(leavingDF,arrivalDF.col("User_Name") === leavingDF.col("User_Name"))
-        .drop(leavingDF.col("User_Name"))
-
-    val workCalculation = userEntries
-      .withColumn("ArrivalTime", date_format(col("Arrival"), "KK:HH:mm a"))
-      .withColumn("LeavingTime", date_format(col("Departure"), "KK:HH:mm a"))
-      .withColumn("OfficeTime",
-        date_format(col("Departure"), "HH").cast(IntegerType)*60 + date_format(col("Departure"), "mm").cast(IntegerType)  -
-        date_format(col("Arrival"), "HH").cast(IntegerType)*60 + date_format(col("Arrival"), "mm").cast(IntegerType)
-      )
-
-      .drop("Arrival","Departure")
-      workCalculation
-  }
-
-  def getUserWorkData(Df:DataFrame, path: String, spark: SparkSession):DataFrame={
-
-   val userIdleData = getIdleTime(Df,path,spark)
-   val userEntries = getUserEntries(Df)
-
-   val df = userIdleData.join(userEntries, userIdleData.col("ID") === userEntries.col("User_Name"))
-
-   val userData = df.drop(col("User_Name"))
-       .withColumn("WorkTime",
-         floor(col("OfficeTime").cast(IntegerType)/60) + col("OfficeTime")%60*.01
-       )
-       .withColumn("WorkingHours",
-         floor((col("OfficeTime")-col("IdealTime"))/60) + (col("OfficeTime")-col("IdealTime"))%60 * .01
-       )
-       .withColumn("IdleTime",
-         (floor(col("IdealTime")/60) + col("IdealTime")%60 * .01).cast(DataTypes.createDecimalType(32,2))
-       )
-       .withColumnRenamed("ID","UserName")
-       .drop("Count","OfficeTime")
-    userData
+  def getListOfFiles(dir: File, extensions: List[String]): List[File] = {
+    dir.listFiles.filter(_.isFile).toList.filter { file =>
+      extensions.exists(file.getName.endsWith(_))
+    }
   }
 
 }
