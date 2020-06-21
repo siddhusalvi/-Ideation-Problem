@@ -1,343 +1,124 @@
 import java.io.{File, FileWriter}
 import java.util.Properties
-import org.apache.spark.sql.functions.from_json
-import org.apache.spark.network.protocol.Encoders
-import org.apache.spark.sql.functions._
-import org.apache.spark.sql.streaming.{OutputMode, Trigger}
-import org.apache.spark.sql.types._
+
+import org.apache.spark.sql.functions.{from_json, _}
+import org.apache.spark.sql.streaming.DataStreamReader
+import org.apache.spark.sql.types.{DataTypes, StructType, _}
 import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
-import org.apache.spark.streaming.{Seconds, StreamingContext}
-import org.apache.spark.sql.streaming.{OutputMode, Trigger}
-
-import scala.concurrent.duration._
-import org.apache.spark.sql.functions._
-import org.apache.spark.sql.SparkSession
-
-
-
-import org.apache.avro.Schema
-import org.apache.avro.generic.GenericRecord
-import org.apache.spark.sql.SparkSession
-import org.apache.spark.sql.functions._
-import org.apache.spark.sql.types.{DataTypes, StructType}
-
-
-
 
 
 object SqlApp {
   def main(args: Array[String]): Unit = {
-//    try {
-      val spark = SparkSession.builder()
-        .config("spark.master", "local[2]")
-        .appName("SqlApp")
-        .getOrCreate()
+   try {
+    val spark = SparkSession.builder()
+      .config("spark.master", "local[2]")
+      .appName("SqlApp")
+      .getOrCreate()
 
-
-
-
-
-//      val tablename = "work"
-//      val sc = spark.sparkContext
-//      val logDfSchema = getDfSchema()
-//      val dir = "src\\resources\\"
-//      val path = dir + "userWorkData.csv"
-//      val prePath = "src/resources/day ("
-//      val postPath = ").csv"
-
-
-//
-//    val schema = StructType(
-//      Array(
-//        StructField("DateTime", StringType),//===================
-//        StructField("Cpu_Count", IntegerType),
-//        StructField("Cpu_Working_Time", DoubleType),
-//        StructField("Cpu_Idle_Time", DoubleType),
-//        StructField("Cpu_Percent", DoubleType),
-//        StructField("Usage_Cpu_Count", IntegerType),
-//        StructField("Software_Interrupts", IntegerType),
-//        StructField("System_calls", IntegerType),
-//        StructField("Interrupts", IntegerType),
-//        StructField("Load_Time_1_min", DoubleType),
-//        StructField("Load_Time_5_min", DoubleType),
-//        StructField("Load_Time_15_min", DoubleType),
-//        StructField("Total_Memory", DoubleType),
-//        StructField("Used_Memory", DoubleType),
-//        StructField("Free_Memory", DoubleType),
-//        StructField("Active_Memory", DoubleType),
-//        StructField("Inactive_Memory", DoubleType),
-//        StructField("Bufferd_Memory", DoubleType),
-//        StructField("Cache_Memory", DoubleType),
-//        StructField("Shared_Memory", DoubleType),
-//        StructField("Available_Memory", DoubleType),
-//        StructField("Total_Disk_Memory", DoubleType),
-//        StructField("Used_Disk_Memory", DoubleType),
-//        StructField("Free_Disk_Memory", DoubleType),
-//        StructField("Read_Disk_Count", IntegerType),
-//        StructField("Write_Disk_Count", IntegerType),
-//        StructField("Read_Disk_Bytes", DoubleType),
-//        StructField("Write_Disk_Bytes", DoubleType),
-//        StructField("Read_Time", IntegerType),
-//        StructField("Write_Time", IntegerType),
-//        StructField("I/O_Time", IntegerType),
-//        StructField("Bytes_Sent", DoubleType),
-//        StructField("Bytes_Received", DoubleType),
-//        StructField("Packets_Sent", IntegerType),
-//        StructField("Packets_Received", IntegerType),
-//        StructField("Errors_While_Sending", IntegerType),
-//        StructField("Errors_While_Receiving", IntegerType),
-//        StructField("Incoming_Packets_Dropped", IntegerType),
-//        StructField("Outgoing_Packets_Dropped", IntegerType),
-//        StructField("Boot_Time", StringType),
-//        StructField("User_Name", StringType),
-//        StructField("Keyboard", DoubleType),
-//        StructField("Mouse", DoubleType),
-//        StructField("Technologies", StringType),
-//        StructField("Files_Changed", IntegerType)
-//      )
-//    )
-//
-//    val schema = StructType(
-//      List(
-//        StructField("name", DataTypes.StringType),//===================
-//        StructField("Count",  DataTypes.IntegerType)
-//      ))
-//
-//
-//
-
-
-
-
-
-
-
+    val tablename = "work"
+    val sc = spark.sparkContext
+    val logDfSchema = getDfSchema()
+    val dir = "src\\resources\\"
+    val path = dir + "userWorkData.csv"
+    val prePath = "src/resources/day ("
+    val postPath = ").csv"
 
 
     import spark.implicits._
 
+    val schema = getStructuredSchema()
 
-
-//    val inputDf = spark.readStream
-//      .format("kafka")
-//      .option("kafka.bootstrap.servers", "localhost:9092")
-//      .option("subscribe", "csv")
-//      .option("startingOffsets", "earliest") // going to replay from the beginning each time
-//      .load()
-//
-//    println("CSV")
-//    val csvDF = inputDf.selectExpr( "CAST(value AS STRING)")
-//
-//    csvDF.writeStream
-//      .outputMode("append")
-//      .format("console")
-//      .start()
-//
-//
-//
-//    val inputDf = spark.readStream
-//      .option("multiline", "true")
-//      .format("kafka")
-//      .option("kafka.bootstrap.servers", "localhost:9092")
-//      .option("subscribe", "json")
-//      .load()
-//      .selectExpr("CAST(value AS STRING)")
-//      .select(from_json($"value", schema).as("Df"))
-//
-//
-//    val selectDf = inputDf.select("*")
-//    selectDf.writeStream
-//      .outputMode("append")
-//      .format("console")
-//      .start()
-//
-//    spark.streams.awaitAnyTermination()
-
-
-
-    val schema = new StructType()
-      .add("id", DataTypes.StringType)
-      .add("count", DataTypes.IntegerType)
-
-
-
-
-
-
-    val inputDf = spark.readStream
+    val topic = "user6"
+    val port = 9092
+    val inputDf = getStreamDF(topic,port,spark)
+      spark.readStream
       .format("kafka")
       .option("kafka.bootstrap.servers", "localhost:9092")
-      .option("subscribe", "user5")
+      .option("subscribe", "user6")
       .option("startingOffsets", "earliest") // going to replay from the beginning each time
       .load()
       .selectExpr("CAST(value AS STRING)")
       .select(from_json($"value", schema).as("Df"))
 
 
-        val selectDf = inputDf.selectExpr("Df.*")
-        selectDf.writeStream
-          .outputMode("append")
-          .format("console")
-          .start()
-
-
-
-
-
-//    val selectDf = inputDf.selectExpr("Df.Mouse","Df.User_Name")
-//    selectDf.writeStream
-//      .outputMode("append")
-//      .format("console")
-//      .start()
-
-//    spark.streams.awaitAnyTermination()
-
-
-
-
-
-
-
-
-
-
-    //    val path = "src/resources/data.json"
-//    val peopleDF = spark.read.option("multiline", "true")
-    //      .json(path)
-//
-//    // The inferred schema can be visualized using the printSchema() method
-//    peopleDF.printSchema()
-//    peopleDF.show()
-//
-
-
-
-
-
-
-
-
-
-//
-//        val stream = spark.readStream.format("kafka")
-//      .option("kafka.bootstrap.servers", "localhost:9092")
-//      .option("subscribe", "Producer")
-//      .load()
-
-
-
-//     val df =spark.readStream
-//      .format("kafka")
-//      .option("kafka.bootstrap.servers", "localhost:9092")
-//      .option("subscribe", "json")
-//      .load()
-//
-//
-//
-//    df.foreach(println(_)
-//    )
-
-
-    //    import spark.implicits._
-//      val ad = df.selectExpr( "CAST(value AS STRING)")
-//        .as[(String)]
-//          .writeStream
-////          .outputMode("complete")
-//          .format("console")
-//          .start()
-//          .awaitTermination()
-
-//    df.select(from_json($"value".cast("string")))
-//      df.select(from_json($"value".cast("string"), schema).alias("value"))
-//      .filter(...)  // Add the condition
-//    .select(to_json($"value").alias("value")
-//      // Write back
-//      .writeStream
-//      .format("kafka")
-//      .option("kafka.bootstrap.servers", outservers)
-//      .option("subscribe", outtopic)
-//      .start()
-
-
-
-    //    val stream = spark.readStream.format("kafka")
-    //      .option("kafka.bootstrap.servers", "localhost:9092")
-    //      .option("subscribe", "Producer")
-    //      .load()
-
-
-
-
-    //    import spark.implicits._
-//    val words = stream.selectExpr("CAST value AS STRING")
-//      .as(Encoders.STRING())
-//    // Generate running word count
-//    val wordCounts = words.groupBy("value").count()
-//
-//    val query = wordCounts.writeStream
-//      .outputMode("complete")
-//      .format("console")
-//      .start()
-//
-//    query.awaitTermination()
-//
-
-//
-//    val df = stream.selectExpr("CAST(key AS STRING)", "CAST(value AS STRING)")
-//      .writeStream
-//      .outputMode("complete")
-//      .format("console")
-//      .start()
-//      .awaitTermination()
-
-//    val df = spark
-//      .readStream
-//      .format("kafka")
-//      .option("kafka.bootstrap.servers", "host1:port1,host2:port2")
-//      .option("subscribe", "topic1")
-//      .load()
-//
-//    df.selectExpr("CAST(key AS STRING)", "CAST(value AS STRING)")
-//      .as[(String, String)]
-//
-
-
-//============================================================
-//    val ds = stream
-//      .writeStream
-//      .format("console")
-//      .option("checkpointLocation", "src/resources/checkpoints")
-//      .start()
-//    ds.awaitTermination()
-
-
-
-
-    //      import spark.implicits._
-//      val kafka = spark.readStream
-//        .format("kafka")
-//        .schema(logDfSchema)
-//        .option("bootstrap.servers", "localhost:9092")
-//        .option("subscribe","Producer")
-//        .option("startingOffsets", "latest")
-//        .load()
-//
-//      kafka.show()
-
-//      val logDF = getDfFromCsv(prePath + "5" + postPath, spark, logDfSchema)
-//      val workOfUser = getUserWorkData(logDF, path, spark).orderBy(col("ArrivalTime"))
-
-
-
-
-
-
-//    } catch {
-//      case exception => println(exception)
-//    }
+    val allDataDF = inputDf.selectExpr("Df.*")
+    allDataDF.writeStream
+      .outputMode("append")
+      .format("console")
+      .start()
 
     spark.streams.awaitAnyTermination()
+   } catch {
+     case exception => println(exception)
+   }
 
+  }
+
+  //Function to get stream config
+  def getStreamDF(topic:String,port:Int,spark:SparkSession):DataFrame={
+    import spark.implicits._
+      val schema =getStructuredSchema()
+      val stream =    spark.readStream
+      .format("kafka")
+      .option("kafka.bootstrap.servers", "localhost:"+port.toString)
+      .option("subscribe", topic)
+      .option("startingOffsets", "earliest") // going to replay from the beginning each time
+      .load()
+      .selectExpr("CAST(value AS STRING)")
+      .select(from_json($"value", schema).as("Df"))
+
+    stream
+  }
+
+  //Function to get schema for Structured streaming
+  def getStructuredSchema(): StructType = {
+    val schema = new StructType()
+      .add("DateTime", DataTypes.TimestampType) //===================
+      .add("Cpu_Count", DataTypes.IntegerType)
+      .add("Cpu_Working_Time", DataTypes.DoubleType)
+      .add("Cpu_Idle_Time", DataTypes.DoubleType)
+      .add("Cpu_Percent", DataTypes.DoubleType)
+      .add("Usage_Cpu_Count", DataTypes.IntegerType)
+      .add("Software_Interrupts", DataTypes.IntegerType)
+      .add("System_calls", DataTypes.IntegerType)
+      .add("Interrupts", DataTypes.IntegerType)
+      .add("Load_Time_1_min", DataTypes.DoubleType)
+      .add("Load_Time_5_min", DataTypes.DoubleType)
+      .add("Load_Time_15_min", DataTypes.DoubleType)
+      .add("Total_Memory", DataTypes.DoubleType)
+      .add("Used_Memory", DataTypes.DoubleType)
+      .add("Free_Memory", DataTypes.DoubleType)
+      .add("Active_Memory", DataTypes.DoubleType)
+      .add("Inactive_Memory", DataTypes.DoubleType)
+      .add("Bufferd_Memory", DataTypes.DoubleType)
+      .add("Cache_Memory", DataTypes.DoubleType)
+      .add("Shared_Memory", DataTypes.DoubleType)
+      .add("Available_Memory", DataTypes.DoubleType)
+      .add("Total_Disk_Memory", DataTypes.DoubleType)
+      .add("Used_Disk_Memory", DataTypes.DoubleType)
+      .add("Free_Disk_Memory", DataTypes.DoubleType)
+      .add("Read_Disk_Count", DataTypes.IntegerType)
+      .add("Write_Disk_Count", DataTypes.IntegerType)
+      .add("Read_Disk_Bytes", DataTypes.DoubleType)
+      .add("Write_Disk_Bytes", DataTypes.DoubleType)
+      .add("Read_Time", DataTypes.IntegerType)
+      .add("Write_Time", DataTypes.IntegerType)
+      .add("I/O_Time", DataTypes.IntegerType)
+      .add("Bytes_Sent", DataTypes.DoubleType)
+      .add("Bytes_Received", DataTypes.DoubleType)
+      .add("Packets_Sent", DataTypes.IntegerType)
+      .add("Packets_Received", DataTypes.IntegerType)
+      .add("Errors_While_Sending", DataTypes.IntegerType)
+      .add("Errors_While_Receiving", DataTypes.IntegerType)
+      .add("Incoming_Packets_Dropped", DataTypes.IntegerType)
+      .add("Outgoing_Packets_Dropped", DataTypes.IntegerType)
+      .add("Boot_Time", DataTypes.StringType)
+      .add("User_Name", DataTypes.StringType)
+      .add("Keyboard", DataTypes.DoubleType)
+      .add("Mouse", DataTypes.DoubleType)
+      .add("Technologies", DataTypes.StringType)
+      .add("Files_Changed", DataTypes.IntegerType)
+    schema
   }
 
   //Function to get idle time, working time
@@ -549,6 +330,15 @@ object SqlApp {
     highestLateUser
   }
 
+  //Function to get leaves of user
+  def getLeaves(spark: SparkSession): DataFrame = {
+    val logArrival = getArrivalData(spark)
+    val leaves = logArrival.groupBy(col("User_Name"))
+      .count()
+    val highestLeavesUser = leaves.withColumn("Leaves", expr("9 - count")).drop("count").orderBy(col("Leaves").desc)
+    highestLeavesUser
+  }
+
   //Function to get arriving time of users
   def getArrivalData(spark: SparkSession): DataFrame = {
     val logDfSchema = getDfSchema()
@@ -582,6 +372,15 @@ object SqlApp {
     logArrival
   }
 
+  //Function to get single user arrival
+  def getArrivalTime(df: DataFrame): DataFrame = {
+    val newDf = df.select(
+      df.col("User_Name"),
+      df.col("DateTime")
+    ).dropDuplicates(Array("User_Name"))
+    newDf
+  }
+
   //Function to get csv dataframe
   def getDfFromCsv(path: String, spark: SparkSession, strct: StructType): DataFrame = {
     val DF = spark.read
@@ -597,7 +396,7 @@ object SqlApp {
   def getDfSchema(): StructType = {
     val schema = StructType(
       Array(
-        StructField("DateTime", TimestampType),//===================
+        StructField("DateTime", TimestampType), //===================
         StructField("Cpu_Count", IntegerType),
         StructField("Cpu_Working_Time", DoubleType),
         StructField("Cpu_Idle_Time", DoubleType),
@@ -645,24 +444,6 @@ object SqlApp {
       )
     )
     schema
-  }
-
-  //Function to get single user arrival
-  def getArrivalTime(df: DataFrame): DataFrame = {
-    val newDf = df.select(
-      df.col("User_Name"),
-      df.col("DateTime")
-    ).dropDuplicates(Array("User_Name"))
-    newDf
-  }
-
-  //Function to get leaves of user
-  def getLeaves(spark: SparkSession): DataFrame = {
-    val logArrival = getArrivalData(spark)
-    val leaves = logArrival.groupBy(col("User_Name"))
-      .count()
-    val highestLeavesUser = leaves.withColumn("Leaves", expr("9 - count")).drop("count").orderBy(col("Leaves").desc)
-    highestLeavesUser
   }
 
   def getListOfFiles(dir: File, extensions: List[String]): List[File] = {
