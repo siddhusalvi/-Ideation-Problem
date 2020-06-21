@@ -31,14 +31,6 @@ object SqlApp {
     val topic = "user6"
     val port = 9092
     val inputDf = getStreamDF(topic,port,spark)
-      spark.readStream
-      .format("kafka")
-      .option("kafka.bootstrap.servers", "localhost:9092")
-      .option("subscribe", "user6")
-      .option("startingOffsets", "earliest") // going to replay from the beginning each time
-      .load()
-      .selectExpr("CAST(value AS STRING)")
-      .select(from_json($"value", schema).as("Df"))
 
 
     val allDataDF = inputDf.selectExpr("Df.*")
