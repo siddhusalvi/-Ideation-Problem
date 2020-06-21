@@ -46,61 +46,61 @@ object SqlApp {
 //      val postPath = ").csv"
 
 
-
-    val schema = StructType(
-      Array(
-        StructField("DateTime", StringType),//===================
-        StructField("Cpu_Count", IntegerType),
-        StructField("Cpu_Working_Time", DoubleType),
-        StructField("Cpu_Idle_Time", DoubleType),
-        StructField("Cpu_Percent", DoubleType),
-        StructField("Usage_Cpu_Count", IntegerType),
-        StructField("Software_Interrupts", IntegerType),
-        StructField("System_calls", IntegerType),
-        StructField("Interrupts", IntegerType),
-        StructField("Load_Time_1_min", DoubleType),
-        StructField("Load_Time_5_min", DoubleType),
-        StructField("Load_Time_15_min", DoubleType),
-        StructField("Total_Memory", DoubleType),
-        StructField("Used_Memory", DoubleType),
-        StructField("Free_Memory", DoubleType),
-        StructField("Active_Memory", DoubleType),
-        StructField("Inactive_Memory", DoubleType),
-        StructField("Bufferd_Memory", DoubleType),
-        StructField("Cache_Memory", DoubleType),
-        StructField("Shared_Memory", DoubleType),
-        StructField("Available_Memory", DoubleType),
-        StructField("Total_Disk_Memory", DoubleType),
-        StructField("Used_Disk_Memory", DoubleType),
-        StructField("Free_Disk_Memory", DoubleType),
-        StructField("Read_Disk_Count", IntegerType),
-        StructField("Write_Disk_Count", IntegerType),
-        StructField("Read_Disk_Bytes", DoubleType),
-        StructField("Write_Disk_Bytes", DoubleType),
-        StructField("Read_Time", IntegerType),
-        StructField("Write_Time", IntegerType),
-        StructField("I/O_Time", IntegerType),
-        StructField("Bytes_Sent", DoubleType),
-        StructField("Bytes_Received", DoubleType),
-        StructField("Packets_Sent", IntegerType),
-        StructField("Packets_Received", IntegerType),
-        StructField("Errors_While_Sending", IntegerType),
-        StructField("Errors_While_Receiving", IntegerType),
-        StructField("Incoming_Packets_Dropped", IntegerType),
-        StructField("Outgoing_Packets_Dropped", IntegerType),
-        StructField("Boot_Time", StringType),
-        StructField("User_Name", StringType),
-        StructField("Keyboard", DoubleType),
-        StructField("Mouse", DoubleType),
-        StructField("Technologies", StringType),
-        StructField("Files_Changed", IntegerType)
-      )
-    )
-
+//
 //    val schema = StructType(
 //      Array(
-//        StructField("id", DataTypes.StringType),//===================
-//        StructField("Count", IntegerType)
+//        StructField("DateTime", StringType),//===================
+//        StructField("Cpu_Count", IntegerType),
+//        StructField("Cpu_Working_Time", DoubleType),
+//        StructField("Cpu_Idle_Time", DoubleType),
+//        StructField("Cpu_Percent", DoubleType),
+//        StructField("Usage_Cpu_Count", IntegerType),
+//        StructField("Software_Interrupts", IntegerType),
+//        StructField("System_calls", IntegerType),
+//        StructField("Interrupts", IntegerType),
+//        StructField("Load_Time_1_min", DoubleType),
+//        StructField("Load_Time_5_min", DoubleType),
+//        StructField("Load_Time_15_min", DoubleType),
+//        StructField("Total_Memory", DoubleType),
+//        StructField("Used_Memory", DoubleType),
+//        StructField("Free_Memory", DoubleType),
+//        StructField("Active_Memory", DoubleType),
+//        StructField("Inactive_Memory", DoubleType),
+//        StructField("Bufferd_Memory", DoubleType),
+//        StructField("Cache_Memory", DoubleType),
+//        StructField("Shared_Memory", DoubleType),
+//        StructField("Available_Memory", DoubleType),
+//        StructField("Total_Disk_Memory", DoubleType),
+//        StructField("Used_Disk_Memory", DoubleType),
+//        StructField("Free_Disk_Memory", DoubleType),
+//        StructField("Read_Disk_Count", IntegerType),
+//        StructField("Write_Disk_Count", IntegerType),
+//        StructField("Read_Disk_Bytes", DoubleType),
+//        StructField("Write_Disk_Bytes", DoubleType),
+//        StructField("Read_Time", IntegerType),
+//        StructField("Write_Time", IntegerType),
+//        StructField("I/O_Time", IntegerType),
+//        StructField("Bytes_Sent", DoubleType),
+//        StructField("Bytes_Received", DoubleType),
+//        StructField("Packets_Sent", IntegerType),
+//        StructField("Packets_Received", IntegerType),
+//        StructField("Errors_While_Sending", IntegerType),
+//        StructField("Errors_While_Receiving", IntegerType),
+//        StructField("Incoming_Packets_Dropped", IntegerType),
+//        StructField("Outgoing_Packets_Dropped", IntegerType),
+//        StructField("Boot_Time", StringType),
+//        StructField("User_Name", StringType),
+//        StructField("Keyboard", DoubleType),
+//        StructField("Mouse", DoubleType),
+//        StructField("Technologies", StringType),
+//        StructField("Files_Changed", IntegerType)
+//      )
+//    )
+//
+//    val schema = StructType(
+//      List(
+//        StructField("name", DataTypes.StringType),//===================
+//        StructField("Count",  DataTypes.IntegerType)
 //      ))
 //
 //
@@ -155,8 +155,9 @@ object SqlApp {
 
 
 
-
-
+    val schema = new StructType()
+      .add("id", DataTypes.StringType)
+      .add("count", DataTypes.IntegerType)
 
 
 
@@ -166,7 +167,7 @@ object SqlApp {
     val inputDf = spark.readStream
       .format("kafka")
       .option("kafka.bootstrap.servers", "localhost:9092")
-      .option("subscribe", "csv1")
+      .option("subscribe", "user5")
       .option("startingOffsets", "earliest") // going to replay from the beginning each time
       .load()
       .selectExpr("CAST(value AS STRING)")
