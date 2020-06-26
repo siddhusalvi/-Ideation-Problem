@@ -1,11 +1,59 @@
 import java.io.{File, FileWriter}
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
 import java.util.Properties
-
+import org.apache.spark.sql
 import org.apache.spark.sql.functions.{from_json, _}
 import org.apache.spark.sql.streaming.DataStreamReader
 import org.apache.spark.sql.types.{DataTypes, StructType, _}
-import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
+import org.apache.spark.sql.{DataFrame, Dataset, SaveMode, SparkSession}
 
+case class Data(DateTime: String,
+                Cpu_Count: Int,
+                Cpu_Working_Time: Double,
+                Cpu_Idle_Time: Double,
+                Cpu_Percent: Double,
+                Usage_Cpu_Count: Int,
+                Software_interrupts: Int,
+                System_calls: Int,
+                Interrupts: Int,
+                Load_Time_1_min: Double,
+                Load_Time_5_min: Double,
+                Load_Time_15_min: Double,
+                Total_Memory: Double,
+                Used_Memory: Double,
+                Free_Memory: Double,
+                Active_Memory: Double,
+                Inactive_Memory: Double,
+                Bufferd_Memory: Double,
+                Cache_Memory: Double,
+                Shared_Memory: Double,
+                Available_Memory: Double,
+                Total_Disk_Memory: Double,
+                Used_Disk_Memory: Double,
+                Free_Disk_Memory: Double,
+                Read_Disk_Count: Int,
+                Write_Disk_Count: Int,
+                Read_Disk_Bytes: Double,
+                Write_Disk_Bytes: Double,
+                Read_Time: Int,
+                Write_Time: Int,
+                IO_Time: Int,
+                Bytes_Sent: Double,
+                Bytes_Received: Double,
+                Packets_Sent: Int,
+                Packets_Received: Int,
+                Errors_While_Sending: Int,
+                Errors_While_Receiving: Int,
+                Incoming_Packets_Dropped: Int,
+                Outgoing_Packets_Dropped: Int,
+                Boot_Time: String,
+                User_Name: String,
+                Keyboard: Double,
+                Mouse: Double,
+                Technologies: String,
+                Files_Changed: Int
+               )
 
 object SqlApp {
   def main(args: Array[String]): Unit = {
@@ -23,27 +71,40 @@ object SqlApp {
     val prePath = "src/resources/day ("
     val postPath = ").csv"
 
-
-    import spark.implicits._
-
-    val schema = getStructuredSchema()
+//     val userData = getDfFromCsv(prePath+"1"+postPath,spark,logDfSchema)
+//       .withColumn("Status",when(col("Mouse")==="0" && col("Keyboard")==="0","Offline").otherwise("Online"))
+//     .select(col("User_Name"),col("Mouse"),col("Keyboard"),col("Status"))
+//       .groupBy("User_Name","Status").count().distinct
+//         .orderBy("User_Name")
+//     userData.coalesce(1).write.csv("src\\resources\\status")
 
     val topic = "user6"
     val port = 9092
     val inputDf = getStreamDF(topic,port,spark)
 
-
     val allDataDF = inputDf.selectExpr("Df.*")
-    allDataDF.writeStream
-      .outputMode("append")
-      .format("console")
-      .start()
 
+    val statusDF = allDataDF.withColumnRenamed("Df.Mouse","Mouse")
+        .withColumnRenamed("Df.Keyboard","Keyboard")
+        .withColumnRenamed("Df.User_Name","User_Name")
+        .withColumn("Status",when(col("Mouse")==="0" && col("Keyboard")==="0","Offline").otherwise("Online"))
+
+     val Df2 = statusDF.select(col("User_Name"),col("Mouse"),col("Keyboard"),col("Status"))
+      printStreamDF(Df2)
     spark.streams.awaitAnyTermination()
    } catch {
      case exception => println(exception)
+        case exception1:ClassNotFoundException => println(exception1)
+        case exception2:sql.AnalysisException => println(exception2)
    }
 
+  }
+
+  def printStreamDF(dataFrame: DataFrame):Unit={
+    dataFrame.writeStream
+      .outputMode("append")
+      .format("console")
+      .start()
   }
 
   //Function to get stream config
@@ -65,7 +126,7 @@ object SqlApp {
   //Function to get schema for Structured streaming
   def getStructuredSchema(): StructType = {
     val schema = new StructType()
-      .add("DateTime", DataTypes.TimestampType) //===================
+      .add("DateTime", DataTypes.StringType) //===================
       .add("Cpu_Count", DataTypes.IntegerType)
       .add("Cpu_Working_Time", DataTypes.DoubleType)
       .add("Cpu_Idle_Time", DataTypes.DoubleType)
