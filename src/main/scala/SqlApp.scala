@@ -2,8 +2,9 @@ import java.io.{File, FileWriter}
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.util.Properties
+
 import org.apache.spark.sql
-import org.apache.spark.sql.functions.{from_json, _}
+import org.apache.spark.sql.functions.{col, from_json, _}
 import org.apache.spark.sql.streaming.DataStreamReader
 import org.apache.spark.sql.types.{DataTypes, StructType, _}
 import org.apache.spark.sql.{DataFrame, Dataset, SaveMode, SparkSession}
@@ -71,13 +72,45 @@ object SqlApp {
     val prePath = "src/resources/day ("
     val postPath = ").csv"
 
-//     val userData = getDfFromCsv(prePath+"1"+postPath,spark,logDfSchema)
-//       .withColumn("Status",when(col("Mouse")==="0" && col("Keyboard")==="0","Offline").otherwise("Online"))
-//     .select(col("User_Name"),col("Mouse"),col("Keyboard"),col("Status"))
-//       .groupBy("User_Name","Status").count().distinct
-//         .orderBy("User_Name")
-//     userData.coalesce(1).write.csv("src\\resources\\status")
+     val userData = getDfFromCsv(prePath + "1" + postPath, spark, logDfSchema)
 
+// Data for Visualization operation
+
+     import java.text.SimpleDateFormat
+     val sdf = new SimpleDateFormat("HH:mm:ss")
+
+     val DF = getUserWorkData(userData, path, spark).drop("")
+     DF.show()
+
+     import spark.implicits._
+     val WorkingTime = DF.select("WorkingTime").map(_.getString(0).toDouble).collect.toList
+
+     val schema = new StructType()
+       .add("UserName", "StringType")
+       .add("IdealTime", "IntegerType")
+       .add("ArrivalTime", "TimeStampType")
+       .add("LeavingTime", "TimeStampType")
+       .add("WorkingTime", "DoubleType")
+       .add("WorkingHours", "DoubleType")
+       .add("IdleTime", "DoubleType")
+     //============================================================ Strucututured Streaming operation ===========================================
+
+     val newDf = userData
+       .withColumn("Action",col("Keyboard")+col("Mouse"))
+       .select(col("User_Name"),col("DateTime"),col("Action"))
+       .filter(col("User_Name") ==="prathameshsalap@gmail.com")
+       .withColumn("id",col("DateTime")cast(StringType))
+         .orderBy(col("DateTime"))
+         .select(col = "id").collect().map(_(0)).toList
+
+     newDf.foreach(data => print("\""+ data +"\","))
+     val newDf2 = userData
+       .withColumn("Action",col("Keyboard")+col("Mouse"))
+       .select(col("User_Name"),col("DateTime"),col("Action"))
+       .withColumn("id",col("DateTime")cast(StringType))
+       .orderBy(col("DateTime"))
+
+     newDf2.show(300)
     val topic = "user6"
     val port = 9092
     val inputDf = getStreamDF(topic,port,spark)
@@ -92,6 +125,7 @@ object SqlApp {
      val Df2 = statusDF.select(col("User_Name"),col("Mouse"),col("Keyboard"),col("Status"))
       printStreamDF(Df2)
     spark.streams.awaitAnyTermination()
+
    } catch {
      case exception => println(exception)
         case exception1:ClassNotFoundException => println(exception1)
@@ -126,7 +160,7 @@ object SqlApp {
   //Function to get schema for Structured streaming
   def getStructuredSchema(): StructType = {
     val schema = new StructType()
-      .add("DateTime", DataTypes.StringType) //===================
+      .add("DateTime", DataTypes.TimestampType) //===================
       .add("Cpu_Count", DataTypes.IntegerType)
       .add("Cpu_Working_Time", DataTypes.DoubleType)
       .add("Cpu_Idle_Time", DataTypes.DoubleType)
