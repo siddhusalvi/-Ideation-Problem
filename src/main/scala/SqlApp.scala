@@ -1,14 +1,11 @@
 import java.io.{File, FileWriter}
-import java.time.LocalDateTime
-import java.time.format.DateTimeFormatter
 import java.util.Properties
-
 import org.apache.spark.sql
 import org.apache.spark.sql.functions.{col, from_json, _}
-import org.apache.spark.sql.streaming.DataStreamReader
 import org.apache.spark.sql.types.{DataTypes, StructType, _}
-import org.apache.spark.sql.{DataFrame, Dataset, SaveMode, SparkSession}
+import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
 
+//class to import csv files
 case class Data(DateTime: String,
                 Cpu_Count: Int,
                 Cpu_Working_Time: Double,
@@ -58,83 +55,52 @@ case class Data(DateTime: String,
 
 object SqlApp {
   def main(args: Array[String]): Unit = {
-   try {
-    val spark = SparkSession.builder()
-      .config("spark.master", "local[2]")
-      .appName("SqlApp")
-      .getOrCreate()
+    try {
+      val spark = SparkSession.builder()
+        .config("spark.master", "local[2]")
+        .appName("SqlApp")
+        .getOrCreate()
 
-    val tablename = "work"
-    val sc = spark.sparkContext
-    val logDfSchema = getDfSchema()
-    val dir = "src\\resources\\"
-    val path = dir + "userWorkData.csv"
-    val prePath = "src/resources/day ("
-    val postPath = ").csv"
+      val tablename = "work"
+      val sc = spark.sparkContext
+      val logDfSchema = getDfSchema()
+      val dir = "src\\resources\\"
+      val path = dir + "userWorkData.csv"
+      val prePath = "src/resources/day ("
+      val postPath = ").csv"
 
-     val userData = getDfFromCsv(prePath + "1" + postPath, spark, logDfSchema)
+      //Getting Single csv data in dataframe
+      val userData = getDfFromCsv(prePath + "1" + postPath, spark, logDfSchema)
+      userData.show()
 
-// Data for Visualization operation
+      val anotherDF = userData.select(col("DateTime"), col("User_Name"), col("Keyboard"), col("Mouse"))
 
-     import java.text.SimpleDateFormat
-     val sdf = new SimpleDateFormat("HH:mm:ss")
+      val leavesOfUser = getLeaves(spark)
+      leavesOfUser.show()
 
-     val DF = getUserWorkData(userData, path, spark).drop("")
-     DF.show()
+      val logDF = getAllData(spark)
 
-     import spark.implicits._
-     val WorkingTime = DF.select("WorkingTime").map(_.getString(0).toDouble).collect.toList
+      val highestIdleUser = getHighestIdleUser(userData)
+      highestIdleUser.show()
 
-     val schema = new StructType()
-       .add("UserName", "StringType")
-       .add("IdealTime", "IntegerType")
-       .add("ArrivalTime", "TimeStampType")
-       .add("LeavingTime", "TimeStampType")
-       .add("WorkingTime", "DoubleType")
-       .add("WorkingHours", "DoubleType")
-       .add("IdleTime", "DoubleType")
-     //============================================================ Strucututured Streaming operation ===========================================
+      val lowestWorikingUser = getLowestWorkingUser(logDF)
+      lowestWorikingUser.show()
 
-     val newDf = userData
-       .withColumn("Action",col("Keyboard")+col("Mouse"))
-       .select(col("User_Name"),col("DateTime"),col("Action"))
-       .filter(col("User_Name") ==="prathameshsalap@gmail.com")
-       .withColumn("id",col("DateTime")cast(StringType))
-         .orderBy(col("DateTime"))
-         .select(col = "id").collect().map(_(0)).toList
+      val lateUsers = getLateComingUser(spark)
+      lateUsers.show()
 
-     newDf.foreach(data => print("\""+ data +"\","))
-     val newDf2 = userData
-       .withColumn("Action",col("Keyboard")+col("Mouse"))
-       .select(col("User_Name"),col("DateTime"),col("Action"))
-       .withColumn("id",col("DateTime")cast(StringType))
-       .orderBy(col("DateTime"))
+      val getWorkOfUser = getUserWorkData(userData, path, spark)
+      getWorkOfUser.show()
 
-     newDf2.show(300)
-    val topic = "user6"
-    val port = 9092
-    val inputDf = getStreamDF(topic,port,spark)
-
-    val allDataDF = inputDf.selectExpr("Df.*")
-
-    val statusDF = allDataDF.withColumnRenamed("Df.Mouse","Mouse")
-        .withColumnRenamed("Df.Keyboard","Keyboard")
-        .withColumnRenamed("Df.User_Name","User_Name")
-        .withColumn("Status",when(col("Mouse")==="0" && col("Keyboard")==="0","Offline").otherwise("Online"))
-
-     val Df2 = statusDF.select(col("User_Name"),col("Mouse"),col("Keyboard"),col("Status"))
-      printStreamDF(Df2)
-    spark.streams.awaitAnyTermination()
-
-   } catch {
-     case exception => println(exception)
-        case exception1:ClassNotFoundException => println(exception1)
-        case exception2:sql.AnalysisException => println(exception2)
-   }
-
+    } catch {
+      case exception1: ClassNotFoundException => println(exception1)
+      case exception2: sql.AnalysisException => println(exception2)
+      case exception => println(exception)
+    }
   }
 
-  def printStreamDF(dataFrame: DataFrame):Unit={
+  //Function to print Stream
+  def printStreamDF(dataFrame: DataFrame): Unit = {
     dataFrame.writeStream
       .outputMode("append")
       .format("console")
@@ -142,12 +108,12 @@ object SqlApp {
   }
 
   //Function to get stream config
-  def getStreamDF(topic:String,port:Int,spark:SparkSession):DataFrame={
+  def getStreamDF(topic: String, port: Int, spark: SparkSession): DataFrame = {
     import spark.implicits._
-      val schema =getStructuredSchema()
-      val stream =    spark.readStream
+    val schema = getStructuredSchema()
+    val stream = spark.readStream
       .format("kafka")
-      .option("kafka.bootstrap.servers", "localhost:"+port.toString)
+      .option("kafka.bootstrap.servers", "localhost:" + port.toString)
       .option("subscribe", topic)
       .option("startingOffsets", "earliest") // going to replay from the beginning each time
       .load()
@@ -294,7 +260,7 @@ object SqlApp {
 
     val idleTime = idleUsers.withColumnRenamed("sum(Time)", "Count")
       .withColumn("IdealTime", col("Count") * 5)
-      .orderBy(col("IdealTime") desc)
+      .orderBy(col("IdealTime"))
 
     idleTime
   }
@@ -533,10 +499,17 @@ object SqlApp {
     schema
   }
 
+  //Function to get all files in directory
   def getListOfFiles(dir: File, extensions: List[String]): List[File] = {
     dir.listFiles.filter(_.isFile).toList.filter { file =>
       extensions.exists(file.getName.endsWith(_))
     }
+  }
+
+  //Function to save csv file
+  def saveAsCsv(df: DataFrame, path: String): Unit = {
+    df.coalesce(1)
+      .write.option("header", "true").csv(path)
   }
 
 }
